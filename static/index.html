@@ -55,6 +55,7 @@
     text-transform: uppercase; color: var(--muted); font-weight: 600;
   }
   #answer { white-space: pre-wrap; }
+  #answer strong { font-weight: 600; }
   #answer .cite { color: var(--accent); font-weight: 500; }
   details {
     border: 1px solid var(--line); border-radius: 6px;
@@ -132,8 +133,10 @@ document.querySelectorAll('.examples span').forEach(el => {
 const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
 function render(text) {
-  return esc(text).replace(/\[([^\]]+?,\s*p\.\s*\d+)\]/g,
-                           '<span class="cite">[$1]</span>');
+  return esc(text)
+    .replace(/\[([^\]]+?,\s*p\.\s*\d+)\]/g, '<span class="cite">[$1]</span>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^(\s*)[-*]\s+/gm, '$1• ');
 }
 
 async function run() {
