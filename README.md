@@ -4,6 +4,8 @@ A retrieval-augmented question answering system over Siemens industrial
 automation documentation. Ask a question in plain English; get an answer
 grounded in the manuals, with the source file and page number for every claim.
 
+![Demo](docs/demo.gif)
+
 ## Why
 
 A maintenance technician troubleshooting a drive fault needs one paragraph
