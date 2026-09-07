@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Siemens Manual Assistant</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --line: #d9dce1;
+    --ink: #16181d;
+    --muted: #6b7280;
+    --accent: #007a8a;
+    --warn: #b45309;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  header {
+    background: var(--panel); border-bottom: 1px solid var(--line);
+    padding: 18px 28px; display: flex; align-items: baseline; gap: 16px;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header .meta { color: var(--muted); font-size: 13px; }
+  main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+  .ask { display: flex; gap: 10px; margin-bottom: 24px; }
+  input[type=text] {
+    flex: 1; padding: 13px 15px; font-size: 15px;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--panel);
+  }
+  input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button {
+    padding: 13px 24px; font-size: 15px; font-weight: 500; cursor: pointer;
+    background: var(--accent); color: #fff; border: 0; border-radius: 6px;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  .examples { margin-bottom: 26px; font-size: 13px; color: var(--muted); }
+  .examples span {
+    display: inline-block; margin: 4px 6px 0 0; padding: 5px 11px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; cursor: pointer;
+  }
+  .examples span:hover { border-color: var(--accent); color: var(--accent); }
+  .cols { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 20px;
+  }
+  .panel h2 {
+    margin: 0 0 14px; font-size: 12px; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--muted); font-weight: 600;
+  }
+  #answer { white-space: pre-wrap; }
+  #answer .cite { color: var(--accent); font-weight: 500; }
+  details {
+    border: 1px solid var(--line); border-radius: 6px;
+    margin-bottom: 8px; overflow: hidden;
+  }
+  summary {
+    cursor: pointer; padding: 10px 12px; font-size: 13px;
+    display: flex; justify-content: space-between; gap: 10px;
+  }
+  summary::-webkit-details-marker { display: none; }
+  .src { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .dist { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .dist.weak { color: var(--warn); }
+  details p {
+    margin: 0; padding: 12px; border-top: 1px solid var(--line);
+    background: #fafbfc; font-size: 13px; white-space: pre-wrap;
+    max-height: 300px; overflow-y: auto;
+  }
+  .note { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Siemens Manual Assistant</h1>
+  <span class="meta" id="meta">loading…</span>
+</header>
+
+<main>
+  <div class="ask">
+    <input id="q" type="text" autocomplete="off"
+           placeholder="What does fault F0002 mean and how do I fix it?">
+    <button id="go">Ask</button>
+  </div>
+
+  <div class="examples">
+    Try:
+    <span>What does fault F0002 mean and how do I fix it?</span>
+    <span>The drive trips as soon as the conveyor starts under load</span>
+    <span>How do I wire an analog input on the S7-1200?</span>
+    <span>What is the oil change interval for the gearbox?</span>
+  </div>
+
+  <div class="cols">
+    <div class="panel">
+      <h2>Answer</h2>
+      <div id="answer" class="note">Ask a question to search the manuals.</div>
+    </div>
+    <div class="panel">
+      <h2>Retrieved passages</h2>
+      <div id="sources" class="note">
+        Every answer is grounded in these excerpts. Lower distance means a
+        closer semantic match.
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const qEl = document.getElementById('q');
+const goEl = document.getElementById('go');
+const ansEl = document.getElementById('answer');
+const srcEl = document.getElementById('sources');
+
+fetch('/api/status').then(r => r.json()).then(d => {
+  document.getElementById('meta').textContent =
+    d.chunks.toLocaleString() + ' indexed passages';
+}).catch(() => {
+  document.getElementById('meta').textContent = 'index unavailable';
+});
+
+document.querySelectorAll('.examples span').forEach(el => {
+  el.onclick = () => { qEl.value = el.textContent; run(); };
+});
+
+const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+function render(text) {
+  return esc(text).replace(/\[([^\]]+?,\s*p\.\s*\d+)\]/g,
+                           '<span class="cite">[$1]</span>');
+}
+
+async function run() {
+  const question = qEl.value.trim();
+  if (!question) return;
+
+  goEl.disabled = true;
+  ansEl.className = 'note';
+  ansEl.textContent = 'Searching manuals and generating answer…';
+  srcEl.innerHTML = '';
+
+  try {
+    const res = await fetch('/api/ask', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question})
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const data = await res.json();
+
+    ansEl.className = '';
+    ansEl.innerHTML = render(data.answer);
+
+    srcEl.innerHTML = data.sources.map((s, i) => `
+      <details>
+        <summary>
+          <span class="src">${i + 1}. ${esc(s.source)} &middot; p.${s.page}</span>
+          <span class="dist ${s.distance > 0.7 ? 'weak' : ''}">${s.distance}</span>
+        </summary>
+        <p>${esc(s.text)}</p>
+      </details>`).join('');
+  } catch (e) {
+    ansEl.className = 'note';
+    ansEl.textContent = 'Error: ' + e.message;
+  } finally {
+    goEl.disabled = false;
+  }
+}
+
+goEl.onclick = run;
+qEl.onkeydown = e => { if (e.key === 'Enter') run(); };
+qEl.focus();
+</script>
+</body>
+</html>

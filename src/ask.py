@@ -67,3 +67,8 @@ if __name__ == "__main__":
         print("\n" + answer(" ".join(sys.argv[1:]), show_sources=True) + "\n")
     else:
         repl()
+    # ChromaDB and torch race during interpreter teardown on macOS.
+    # Everything above has already run; skip destructors.
+    import sys, os
+    sys.stdout.flush()
+    os._exit(0)

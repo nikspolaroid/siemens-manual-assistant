@@ -44,7 +44,7 @@ Download manuals into `data/manuals/` (see the README there), then:
     python src/ingest.py    # inspect chunk counts
     python src/index.py     # build the vector index
     python src/ask.py       # command line
-    streamlit run src/app.py # browser UI
+    python src/server.py    # browser UI at http://127.0.0.1:8000
 
 ## Current limitations
 
